@@ -39,33 +39,21 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             mSocket = new DatagramSocket();
-        }
-        catch (SocketException ex) {
-            Log.d(TAG, "Error creating socket");
-        }
-
-        try {
             mServerAddress = InetAddress.getByName(SERVER_NAME);
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        ((TextView)findViewById(R.id.textView)).setText(info1);
-        while (!ready) {
+            ((TextView)findViewById(R.id.textView)).setText(info1);
+            while (!ready) {
+            }
             username = ((EditText)findViewById(R.id.editText)).getText().toString();
-        }
-
-        try {
             sendJoinMessage(username);
             DatagramPacket packet = receiveResponse();
             displayResults(packet);
+            ((TextView)findViewById(R.id.textView)).setText(info2);
         }
         catch (IOException e) {
             e.printStackTrace();
         }
 
-        ((TextView)findViewById(R.id.textView)).setText(info2);
+
 
         MessageSender sdr = new MessageSender(mSocket, SERVER_NAME, token);
         MessageReceiver rvr = new MessageReceiver(mSocket, token);
