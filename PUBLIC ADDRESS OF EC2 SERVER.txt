@@ -1,0 +1,2 @@
+Public DNS (IPv4):
+ec2-18-191-220-46.us-east-2.compute.amazonaws.com

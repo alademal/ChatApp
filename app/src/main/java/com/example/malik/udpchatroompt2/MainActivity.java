@@ -39,6 +39,12 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             mSocket = new DatagramSocket();
+        }
+        catch (SocketException ex) {
+            Log.d(TAG, "Error creating socket");
+        }
+
+        try {
             mServerAddress = InetAddress.getByName(SERVER_NAME);
         }
         catch (IOException e) {
