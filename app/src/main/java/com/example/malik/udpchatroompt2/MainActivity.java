@@ -47,9 +47,8 @@ public class MainActivity extends AppCompatActivity {
 
         ((TextView)findViewById(R.id.textView)).setText(info1);
         while (!ready) {
+            username = ((EditText)findViewById(R.id.editText)).getText().toString();
         }
-
-        username = ((EditText)findViewById(R.id.editText)).getText().toString();
 
         try {
             sendJoinMessage(username);
