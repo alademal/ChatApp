@@ -3,6 +3,7 @@ package com.example.malik.udpchatroompt2;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -20,30 +21,37 @@ public class MainActivity extends AppCompatActivity {
 
     private static InetAddress mServerAddress;
     private static DatagramSocket mSocket;
-    private static byte[] mPacketBuffer = new byte[BUFFER_SIZE];
 
     private static final String JOINMESSAGE = "TYPE=JOIN;USERNAME=";
     private static final String JOINRESPONSE_0 = "TYPE=JOINRESPONSE;STATUS=0;TOKEN=";
-    private static final String JOINRESPONSE_1 = "TYPE=JOINRESPONSE;STATUS=1;MESSAGE=error";
-    private static final String POST = "TYPE=POST;TOKEN=";
     private static String token = "";
     private static String username = "";
     private static final String TAG = "HW03";
+    private static boolean ready = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        boolean connected = true;
         String info1 = "Welcome to HW03Chat! What is your name?";
         String info2 = "Successfully joined HW03Chat!\nEnter 'LEAVE' to exit.";
-        String msg = "";
+
         try {
             mSocket = new DatagramSocket();
             mServerAddress = InetAddress.getByName(SERVER_NAME);
-            ((TextView)findViewById(R.id.textView)).setText(info1);
-            username = ((EditText)findViewById(R.id.editText)).getText().toString();
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        ((TextView)findViewById(R.id.textView)).setText(info1);
+        while (!ready) {
+        }
+
+        username = ((EditText)findViewById(R.id.editText)).getText().toString();
+
+        try {
             sendJoinMessage(username);
             DatagramPacket packet = receiveResponse();
             displayResults(packet);
@@ -60,6 +68,10 @@ public class MainActivity extends AppCompatActivity {
         Thread receiver = new Thread(rvr);
         sender.start();
         receiver.start();
+    }
+
+    private void btnJoin(View view) throws IOException {
+        ready = true;
     }
 
     private static void sendJoinMessage(String message) throws IOException {
@@ -91,7 +103,6 @@ public class MainActivity extends AppCompatActivity {
         //private static final String SERVER_NAME = "10.66.54.13";
         private static final String SERVER_NAME = "localhost";
         private static final int SERVER_PORT = 4445;
-        private static final String JOINMESSAGE = "TYPE=JOIN;USERNAME=";
         private static final String POST = "TYPE=POST;TOKEN=";
         private static final String MESSAGE = ";MESSAGE=";
         private static final String LEAVE = "TYPE=LEAVE;TOKEN=";
@@ -103,6 +114,7 @@ public class MainActivity extends AppCompatActivity {
         private byte[] buffer;
         private String token;
         private boolean connected = true;
+        private boolean readyToSend = false;
 
         public MessageSender(DatagramSocket s, String h, String t) {
             mSocket = s;
@@ -110,22 +122,20 @@ public class MainActivity extends AppCompatActivity {
             token = t;
         }
 
-        private void btnMessageSend() throws IOException {
-            message = ((EditText)findViewById(R.id.editText)).getText().toString();
-            String encodedMsg = encodeMessage(message);
-            deliverMessage(encodedMsg);
+        private void btnMessageSend(View view) throws IOException {
+            readyToSend = true;
         }
 
         private String encodeMessage(String message) throws IOException {
-            String encodedMessage = "";
+            String encodedMsg = "";
             if (message.equals("LEAVE")) {
-                encodedMessage = LEAVE + token;
+                encodedMsg = LEAVE + token;
                 connected = false;
             }
             else {
-                encodedMessage = POST + token + MESSAGE + message;
+                encodedMsg = POST + token + MESSAGE + message;
             }
-            return encodedMessage;
+            return encodedMsg;
         }
 
         private void deliverMessage(String msg) throws IOException {
@@ -138,12 +148,17 @@ public class MainActivity extends AppCompatActivity {
 
         public void run() {
             while (connected) {
+                while(!readyToSend) {
+                    message = ((EditText)findViewById(R.id.editText)).getText().toString();
+                }
                 try {
-                    btnMessageSend();
+                    String encodedMessage = encodeMessage(message);
+                    deliverMessage(encodedMessage);
                 }
                 catch (IOException e) {
                     e.printStackTrace();
                 }
+                readyToSend = false;
             }
         }
     }
@@ -172,8 +187,11 @@ public class MainActivity extends AppCompatActivity {
             while (connected) {
                 try {
                     DatagramPacket mPacket = new DatagramPacket(mPacketBuffer, mPacketBuffer.length);
-                    mSocket.receive(mPacket);
-                    displayResults(mPacket);
+                    if (mSocket != null)
+                    {
+                        mSocket.receive(mPacket);
+                        displayResults(mPacket);
+                    }
                 }
                 catch (IOException e) {
                     e.printStackTrace();
