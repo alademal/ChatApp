@@ -2,14 +2,14 @@ package com.example.malik.udpchatroompt2;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.EditText;
+import android.widget.TextView;
 
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.InputStreamReader;
 import java.net.Socket;
 
 public class MainActivity extends AppCompatActivity {
@@ -28,6 +28,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String POST = "TYPE=POST;TOKEN=";
     private static String token = "";
     private static String username = "";
+    private static final String TAG = "HW03";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,13 +36,14 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         boolean connected = true;
+        String info1 = "Welcome to HW03Chat! What is your name?";
+        String info2 = "Successfully joined HW03Chat!\nEnter 'LEAVE' to exit.";
         String msg = "";
         try {
             mSocket = new DatagramSocket();
             mServerAddress = InetAddress.getByName(SERVER_NAME);
-            System.out.println("Welcome to HW02Chat! What is your name?");
-            BufferedReader userBufferedReader = new BufferedReader(new InputStreamReader(System.in));
-            username = userBufferedReader.readLine();
+            ((TextView)findViewById(R.id.textView)).setText(info1);
+            username = ((EditText)findViewById(R.id.editText)).getText().toString();
             sendJoinMessage(username);
             DatagramPacket packet = receiveResponse();
             displayResults(packet);
@@ -50,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
-        System.out.println("Successfully joined UDP Chat Room!\nType 'LEAVE' to exit.");
+        ((TextView)findViewById(R.id.textView)).setText(info2);
 
         MessageSender sdr = new MessageSender(mSocket, SERVER_NAME, token);
         MessageReceiver rvr = new MessageReceiver(mSocket, token);
@@ -58,10 +60,6 @@ public class MainActivity extends AppCompatActivity {
         Thread receiver = new Thread(rvr);
         sender.start();
         receiver.start();
-    }
-
-    protected void buttonClick() {
-
     }
 
     private static void sendJoinMessage(String message) throws IOException {
@@ -101,7 +99,6 @@ public class MainActivity extends AppCompatActivity {
         private DatagramPacket packet;
         private InetAddress mServerAddress;
         private String hostname;
-        private BufferedReader userBufferedReader;
         private String message;
         private byte[] buffer;
         private String token;
@@ -111,6 +108,12 @@ public class MainActivity extends AppCompatActivity {
             mSocket = s;
             hostname = h;
             token = t;
+        }
+
+        private void btnMessageSend() throws IOException {
+            message = ((EditText)findViewById(R.id.editText)).getText().toString();
+            String encodedMsg = encodeMessage(message);
+            deliverMessage(encodedMsg);
         }
 
         private String encodeMessage(String message) throws IOException {
@@ -127,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
 
         private void deliverMessage(String msg) throws IOException {
             buffer = msg.getBytes();
-            System.out.println("Sending: " + msg);
+            Log.d(TAG, "Sending: " + msg);
             mServerAddress = InetAddress.getByName(SERVER_NAME);
             packet = new DatagramPacket(buffer, buffer.length, mServerAddress, SERVER_PORT);
             mSocket.send(packet);
@@ -136,10 +139,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             while (connected) {
                 try {
-                    userBufferedReader = new BufferedReader(new InputStreamReader(System.in));
-                    message = userBufferedReader.readLine();
-                    String encodedMessage = encodeMessage(message);
-                    deliverMessage(encodedMessage);
+                    btnMessageSend();
                 }
                 catch (IOException e) {
                     e.printStackTrace();
@@ -157,6 +157,7 @@ public class MainActivity extends AppCompatActivity {
         private static final String NEWMESSAGE = "TYPE=NEWMESSAGE;USERNAME=";
         private static final String MESSAGE = ";MESSAGE=";
         private static final String BYE = "TYPE=BYE";
+        private static final String farewell = "Bye! Come again soon!";
 
         private boolean connected = true;
 
@@ -167,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void run() {
-            System.out.println("Receiver activated.");
+            Log.d(TAG, "Receiver activated.");
             while (connected) {
                 try {
                     DatagramPacket mPacket = new DatagramPacket(mPacketBuffer, mPacketBuffer.length);
@@ -178,8 +179,6 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
-
-            //return packet;
         }
 
         private void displayResults(DatagramPacket packet) {
@@ -187,13 +186,13 @@ public class MainActivity extends AppCompatActivity {
             if (received.startsWith(NEWMESSAGE)) {
                 String username = token.substring(0, token.indexOf("|"));
                 String senderName = received.substring(NEWMESSAGE.length(), received.indexOf(MESSAGE));
-                System.out.println("Compare - Username: " + username + " and Sendername: " + senderName);
+                String post = senderName + ": " + received.substring(received.indexOf(MESSAGE)+1);
                 if (!username.equals(senderName)){
-                    System.out.println(senderName + ": " + received.substring(received.indexOf(MESSAGE)+1));
+                    ((TextView)findViewById(R.id.textView)).setText(post);
                 }
             }
             else if (received.startsWith(BYE)) {
-                System.out.println("Bye! Come again soon!");
+                ((TextView)findViewById(R.id.textView)).setText(farewell);
                 connected = false;
             }
         }
