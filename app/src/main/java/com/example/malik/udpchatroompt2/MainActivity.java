@@ -15,56 +15,127 @@ import java.net.Socket;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String SERVER_NAME = "ec2-18-191-220-46.us-east-2.compute.amazonaws.com";
+    //    private static final String SERVER_NAME = "ec2-18-191-220-46.us-east-2.compute.amazonaws.com";
+    private static final String SERVER_NAME = "localhost";
     private static final int SERVER_PORT = 4445;
     private static final int BUFFER_SIZE = 256;
 
     private static InetAddress mServerAddress;
     private static DatagramSocket mSocket;
+    private static byte[] buffer;
 
+    private static final String POST = "TYPE=POST;TOKEN=";
+    private static final String MESSAGE = ";MESSAGE=";
+    private static final String LEAVE = "TYPE=LEAVE;TOKEN=";
     private static final String JOINMESSAGE = "TYPE=JOIN;USERNAME=";
     private static final String JOINRESPONSE_0 = "TYPE=JOINRESPONSE;STATUS=0;TOKEN=";
+    private static final String NEWMESSAGE = "TYPE=NEWMESSAGE;USERNAME=";
+    private static final String BYE = "TYPE=BYE";
+    private static final String farewell = "Bye! Come again soon!";
     private static String token = "";
     private static String username = "";
+    private static String message = "";
     private static final String TAG = "HW03";
-    private static boolean ready = false;
+    private boolean readyToSend = false;
+    private boolean connected1 = true;
+    private boolean connected2 = true;
+    private boolean firstMsg = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        String info1 = "Welcome to HW03Chat! What is your name?";
-        String info2 = "Successfully joined HW03Chat!\nEnter 'LEAVE' to exit.";
+        final String info1 = "Welcome to HW03Chat! What is your name?";
+        final String info2 = "Successfully joined HW03Chat!\nEnter 'LEAVE' to exit.";
 
-        try {
-            mSocket = new DatagramSocket();
-            mServerAddress = InetAddress.getByName(SERVER_NAME);
-            ((TextView)findViewById(R.id.textView)).setText(info1);
-            while (!ready) {
+        Thread messageSender = new Thread(new Runnable() {
+            DatagramPacket packet;
+
+            private String encodeMessage(String message) throws IOException {
+                String encodedMsg = "";
+                if (firstMsg) {
+                    encodedMsg = JOINMESSAGE + username;
+                    firstMsg = false;
+                } else if (message.equals("LEAVE")) {
+                    encodedMsg = LEAVE + token;
+                    connected1 = false;
+                } else {
+                    encodedMsg = POST + token + MESSAGE + message;
+                }
+                return encodedMsg;
             }
-            username = ((EditText)findViewById(R.id.editText)).getText().toString();
-            sendJoinMessage(username);
-            DatagramPacket packet = receiveResponse();
-            displayResults(packet);
-            ((TextView)findViewById(R.id.textView)).setText(info2);
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-        }
 
+            private void deliverMessage(String msg) throws IOException {
+                buffer = msg.getBytes();
+                Log.d(TAG, "Sending: " + msg);
+                mServerAddress = InetAddress.getByName(SERVER_NAME);
+                packet = new DatagramPacket(buffer, buffer.length, mServerAddress, SERVER_PORT);
+                mSocket.send(packet);
+            }
 
+            public void run() {
+                ((TextView)findViewById(R.id.textView)).setText(info1);
+                while (connected1) {
+                    while (!readyToSend) {
+                    }
+                    message = ((EditText) findViewById(R.id.editText)).getText().toString();
+                    try {
+                        String encodedMessage = encodeMessage(message);
+                        deliverMessage(encodedMessage);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    readyToSend = false;
+                }
+            }
+        });
 
-        MessageSender sdr = new MessageSender(mSocket, SERVER_NAME, token);
-        MessageReceiver rvr = new MessageReceiver(mSocket, token);
-        Thread sender = new Thread(sdr);
-        Thread receiver = new Thread(rvr);
-        sender.start();
-        receiver.start();
-    }
+        Thread messageReceiver = new Thread(new Runnable() {
+            public void run() {
+                Log.d(TAG, "Receiver activated.");
+                while (connected2) {
+                    try {
+                        buffer = new byte[BUFFER_SIZE];
+                        DatagramPacket mPacket = new DatagramPacket(buffer, buffer.length);
+                        if (mSocket != null)
+                        {
+                            mSocket.receive(mPacket);
+                            displayResults(mPacket);
+                        }
+                    }
+                    catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
 
-    private void btnJoin(View view) throws IOException {
-        ready = true;
+            private void displayResults(DatagramPacket packet) {
+                String received = new String(packet.getData(), 0, packet.getLength());
+                if (received.startsWith(JOINRESPONSE_0)) {
+                    token = received.substring(JOINRESPONSE_0.length());
+                    ((TextView)findViewById(R.id.textView)).setText(info2);
+                }
+                if (received.startsWith(NEWMESSAGE)) {
+                    String username = token.substring(0, token.indexOf("|"));
+                    String senderName = received.substring(NEWMESSAGE.length(), received.indexOf(MESSAGE));
+                    String post = senderName + ": " + received.substring(received.indexOf(MESSAGE)+1);
+                    if (!username.equals(senderName)){
+                        ((TextView)findViewById(R.id.textView)).setText(post);
+                    }
+                }
+                else if (received.startsWith(BYE)) {
+                    ((TextView)findViewById(R.id.textView)).setText(farewell);
+                    connected2 = false;
+                }
+                else {
+                    ((TextView)findViewById(R.id.textView)).setText("ERROR");
+                }
+            }
+        });
+
+        messageSender.start();
+        messageReceiver.start();
     }
 
     private static void sendJoinMessage(String message) throws IOException {
@@ -89,123 +160,6 @@ public class MainActivity extends AppCompatActivity {
         String received = new String(packet.getData(), 0, packet.getLength());
         if (received.startsWith(JOINRESPONSE_0)) {
             token = received.substring(JOINRESPONSE_0.length());
-        }
-    }
-
-    private class MessageSender implements Runnable{
-        //private static final String SERVER_NAME = "10.66.54.13";
-        private static final String SERVER_NAME = "localhost";
-        private static final int SERVER_PORT = 4445;
-        private static final String POST = "TYPE=POST;TOKEN=";
-        private static final String MESSAGE = ";MESSAGE=";
-        private static final String LEAVE = "TYPE=LEAVE;TOKEN=";
-        private DatagramSocket mSocket;
-        private DatagramPacket packet;
-        private InetAddress mServerAddress;
-        private String hostname;
-        private String message;
-        private byte[] buffer;
-        private String token;
-        private boolean connected = true;
-        private boolean readyToSend = false;
-
-        public MessageSender(DatagramSocket s, String h, String t) {
-            mSocket = s;
-            hostname = h;
-            token = t;
-        }
-
-        private void btnMessageSend(View view) throws IOException {
-            readyToSend = true;
-        }
-
-        private String encodeMessage(String message) throws IOException {
-            String encodedMsg = "";
-            if (message.equals("LEAVE")) {
-                encodedMsg = LEAVE + token;
-                connected = false;
-            }
-            else {
-                encodedMsg = POST + token + MESSAGE + message;
-            }
-            return encodedMsg;
-        }
-
-        private void deliverMessage(String msg) throws IOException {
-            buffer = msg.getBytes();
-            Log.d(TAG, "Sending: " + msg);
-            mServerAddress = InetAddress.getByName(SERVER_NAME);
-            packet = new DatagramPacket(buffer, buffer.length, mServerAddress, SERVER_PORT);
-            mSocket.send(packet);
-        }
-
-        public void run() {
-            while (connected) {
-                while(!readyToSend) {
-                    message = ((EditText)findViewById(R.id.editText)).getText().toString();
-                }
-                try {
-                    String encodedMessage = encodeMessage(message);
-                    deliverMessage(encodedMessage);
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                }
-                readyToSend = false;
-            }
-        }
-    }
-
-    private class MessageReceiver implements Runnable{
-        private static final int BUFFER_SIZE = 256;
-        private DatagramSocket mSocket;
-        private byte[] mPacketBuffer;
-        private String token;
-
-        private static final String NEWMESSAGE = "TYPE=NEWMESSAGE;USERNAME=";
-        private static final String MESSAGE = ";MESSAGE=";
-        private static final String BYE = "TYPE=BYE";
-        private static final String farewell = "Bye! Come again soon!";
-
-        private boolean connected = true;
-
-        public MessageReceiver(DatagramSocket s, String t) {
-            mSocket = s;
-            token = t;
-            mPacketBuffer = new byte[BUFFER_SIZE];
-        }
-
-        public void run() {
-            Log.d(TAG, "Receiver activated.");
-            while (connected) {
-                try {
-                    DatagramPacket mPacket = new DatagramPacket(mPacketBuffer, mPacketBuffer.length);
-                    if (mSocket != null)
-                    {
-                        mSocket.receive(mPacket);
-                        displayResults(mPacket);
-                    }
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        private void displayResults(DatagramPacket packet) {
-            String received = new String(packet.getData(), 0, packet.getLength());
-            if (received.startsWith(NEWMESSAGE)) {
-                String username = token.substring(0, token.indexOf("|"));
-                String senderName = received.substring(NEWMESSAGE.length(), received.indexOf(MESSAGE));
-                String post = senderName + ": " + received.substring(received.indexOf(MESSAGE)+1);
-                if (!username.equals(senderName)){
-                    ((TextView)findViewById(R.id.textView)).setText(post);
-                }
-            }
-            else if (received.startsWith(BYE)) {
-                ((TextView)findViewById(R.id.textView)).setText(farewell);
-                connected = false;
-            }
         }
     }
 }
