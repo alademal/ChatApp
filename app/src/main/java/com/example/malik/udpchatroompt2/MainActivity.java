@@ -16,7 +16,7 @@ import java.net.Socket;
 public class MainActivity extends AppCompatActivity {
 
     private static final String SERVER_NAME = "ec2-18-191-220-46.us-east-2.compute.amazonaws.com";
-//    private static final String SERVER_NAME = "localhost";
+
     private static final int SERVER_PORT = 4445;
     private static final int BUFFER_SIZE = 256;
 
@@ -33,7 +33,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String BYE = "TYPE=BYE";
     private static final String farewell = "Bye! Come again soon!";
     private static String token = "";
-    private static String username = "";
     private static String message = "";
     private static final String TAG = "HW03";
     private boolean readyToSend = false;
@@ -49,19 +48,28 @@ public class MainActivity extends AppCompatActivity {
         final String info1 = "Welcome to HW03Chat! What is your name?";
         final String info2 = "Successfully joined HW03Chat!\nEnter 'LEAVE' to exit.";
 
+        try {
+            mSocket = new DatagramSocket();
+        }
+        catch (SocketException e) {
+            e.printStackTrace();
+        }
+
         Thread messageSender = new Thread(new Runnable() {
             DatagramPacket packet;
 
             private String encodeMessage(String message) throws IOException {
                 String encodedMsg = "";
                 if (firstMsg) {
-                    encodedMsg = JOINMESSAGE + username;
+                    encodedMsg = JOINMESSAGE + message;
                     firstMsg = false;
                 } else if (message.equals("LEAVE")) {
                     encodedMsg = LEAVE + token;
                     connected1 = false;
+                    firstMsg = true;
                 } else {
                     encodedMsg = POST + token + MESSAGE + message;
+                    Log.d(TAG, "Sent: " + encodedMsg);
                 }
                 return encodedMsg;
             }
@@ -129,7 +137,8 @@ public class MainActivity extends AppCompatActivity {
                     connected2 = false;
                 }
                 else {
-                    ((TextView)findViewById(R.id.textView)).setText("ERROR");
+                    String error = "ERROR";
+                    ((TextView)findViewById(R.id.textView)).setText(error);
                 }
             }
         });
@@ -138,28 +147,7 @@ public class MainActivity extends AppCompatActivity {
         messageReceiver.start();
     }
 
-    private static void sendJoinMessage(String message) throws IOException {
-        message = JOINMESSAGE + message;
-        byte[] buffer = message.getBytes();
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length, mServerAddress, SERVER_PORT);
-        mSocket.send(packet);
-    }
-
-    private static DatagramPacket receiveResponse() throws IOException {
-        byte[] buffer = new byte[BUFFER_SIZE];
-        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-        mSocket.receive(packet);
-
-        InetAddress serverAddress = packet.getAddress();
-        int serverPort = packet.getPort();
-
-        return packet;
-    }
-
-    private static void displayResults(DatagramPacket packet) {
-        String received = new String(packet.getData(), 0, packet.getLength());
-        if (received.startsWith(JOINRESPONSE_0)) {
-            token = received.substring(JOINRESPONSE_0.length());
-        }
+    public void sendMsg(View view) {
+        readyToSend = true;
     }
 }
