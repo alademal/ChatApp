@@ -1,4 +1,4 @@
-import ClientPackage.*;
+import UdpMsg.*;
 
 import java.io.*;
 import java.net.*;
@@ -10,7 +10,7 @@ public class ServerTest {
 
     private static final int SERVER_PORT = 4445;
     private static final int BUFFER_SIZE = 256;
-    private static final String HOST_NAME = "ec2-18-191-220-46.us-east-2.compute.amazonaws.com";
+    private static final String HOST_NAME = "localhost";
 
     private static DatagramSocket mSocket;
 
@@ -27,16 +27,16 @@ public class ServerTest {
         "fail to double JOIN: ", "successful POST: "};
 
     public static void main(String[] args) throws IOException {
-        System.out.println("1");
+        System.out.println("0");
         initialTest();
-        System.out.println("2");
+        System.out.println("1");
         try {
             testSuccessfulJoin();
         }
         catch (IOException e) {
             ++untested;
         }
-        System.out.println("3");
+        System.out.println("2");
         
         try {
             testSuccessfulLeave();
@@ -44,21 +44,21 @@ public class ServerTest {
         catch (IOException e) {
             ++untested;
         }
-        System.out.println("4");
+        System.out.println("3");
         try {
             testLeaveAndRejoin();
         }
         catch (IOException e) {
             ++untested;
         }
-       System.out.println("5");
+        System.out.println("4");
         try {
             testUniqueUsername();
         }
         catch (IOException e) {
             ++untested;
         }
-        System.out.println("6");
+        System.out.println("5");
         try {
             testPost();
         }
@@ -93,8 +93,8 @@ public class ServerTest {
             array.add("expected message to contain key: " + key);
             return;
         }
-
-        if (expectedValue != null || !value.equals(expectedValue)) {
+        
+        if (!value.equals(expectedValue)) {
             ++failedAssert;
             array.add("expected message key to be: {" + expectedValue + "}, got: {" + value + "} instead.");
             return;
@@ -118,12 +118,12 @@ public class ServerTest {
         }
     }
     
-    private static Thread getServerMessage = new Thread(new Runnable(){
+    private static void getServerMessage() {
         
-        private boolean msgReceived = false;
-        private String gotMsg;
+        boolean msgReceived = false;
+        String gotMsg = "";
         
-        public void run() {
+        serverMessage = new UdpMessage();
             byte[] packetBuffer = new byte[BUFFER_SIZE];    
             DatagramPacket packet = new DatagramPacket(packetBuffer, packetBuffer.length,
                 mServerAddress, SERVER_PORT);
@@ -136,13 +136,19 @@ public class ServerTest {
                     e.printStackTrace();
                 }
                 if (!gotMsg.equals("")) {
-                    System.out.println("gotMsg = " + gotMsg);
+                    serverMessage.fullMsg(gotMsg);
+                    String[] parameters = gotMsg.split(";");
+                    for (int i = 0; i < parameters.length; ++i) {
+                        System.out.println(parameters[i]);
+                        String key = parameters[i].substring(0, parameters[i].indexOf("="));
+                        String value = parameters[i].substring(parameters[i].indexOf("=")+1);
+                        serverMessage.putParam(key, value);
+                    }
                     msgReceived = true;
                 }
             }
             serverMessage.assignPacket(packet);
-        }
-    });
+    }
 
     public static void join() throws IOException {
         UdpMessage udpMessage = new UdpMessage();
@@ -162,32 +168,36 @@ public class ServerTest {
         udpMessage.fullMsg("TYPE=POST;TOKEN=" + mToken + ";MESSAGE=" + message);
         udpMessage.send(mSocket);
     }
-
-    public static void testSuccessfulJoin() throws IOException {
-        join();
-        System.out.println("2.5");
-        getServerMessage.start();
-        serverMessage.printMessage();
-        System.out.println("2.6");
-        ArrayList<String> arr = new ArrayList<String>();
-        assertMessageContains(arr, serverMessage, "TYPE", "JOINRESPONSE");
-        assertMessageContains(arr, serverMessage, "STATUS", "0");
-        assertMessageContains(arr, serverMessage, "TOKEN", mToken);
-        allTests.add(arr);
-        System.out.println("2.7");
-        mToken = serverMessage.getParam("TOKEN");
-    }
     
-    private static void testSuccessfulLeave() throws IOException {
+    public static void leave() throws IOException {
         UdpMessage udpMessage = new UdpMessage();
         udpMessage.setDestination(mServerAddress, SERVER_PORT);
         udpMessage.putParam("TYPE", "LEAVE");
         udpMessage.putParam("TOKEN", mToken);
         udpMessage.fullMsg("TYPE=LEAVE;TOKEN=" + mToken);
         udpMessage.send(mSocket);
-        mToken = null;
+    }
 
-        getServerMessage.start();
+    public static void testSuccessfulJoin() throws IOException {
+        join();
+        System.out.println("1.5");
+        getServerMessage();
+        serverMessage.printMessage();
+        System.out.println("1.6");
+        ArrayList<String> arr = new ArrayList<String>();
+        assertMessageContains(arr, serverMessage, "TYPE", "JOINRESPONSE");
+        assertMessageContains(arr, serverMessage, "STATUS", "0");
+        String expectedToken = username + "'s token"; 
+        assertMessageContains(arr, serverMessage, "TOKEN", expectedToken);
+        allTests.add(arr);
+        System.out.println("1.7");
+        mToken = serverMessage.getParam("TOKEN");
+    }
+    
+    private static void testSuccessfulLeave() throws IOException {
+        leave();
+
+        getServerMessage();
         ArrayList<String> arr = new ArrayList<String>();
         assertMessageContains(arr, serverMessage, "TYPE", "BYE");
         allTests.add(arr);
@@ -199,28 +209,30 @@ public class ServerTest {
 
     public static void testUniqueUsername() throws IOException {
         join();
-        getServerMessage.start();
+        getServerMessage();
         join();
-        getServerMessage.start();
+        getServerMessage();
 
         serverMessage.printMessage();
         ArrayList<String> arr = new ArrayList<String>();
         assertMessageContains(arr, serverMessage, "TYPE", "JOINRESPONSE");
         assertMessageContains(arr, serverMessage, "STATUS", "1");
-        assertMessageContains(arr, serverMessage, "TOKEN", null);
+        assertMessageContains(arr, serverMessage, "MESSAGE", "error");
         allTests.add(arr);
     }
 
     public static void testPost() throws IOException {
         String message = "test post";
         post(message);
-        getServerMessage.start();
+        getServerMessage();
         
         serverMessage.printMessage();
         ArrayList<String> arr = new ArrayList<String>();
-        assertMessageContains(arr, serverMessage, "TYPE", "POST");
-        assertMessageContains(arr, serverMessage, "TOKEN", mToken);
+        assertMessageContains(arr, serverMessage, "TYPE", "NEWMESSAGE");
+        assertMessageContains(arr, serverMessage, "USERNAME", username);
         assertMessageContains(arr, serverMessage, "MESSAGE", message);
         allTests.add(arr);
+        
+        leave();
     }
 }

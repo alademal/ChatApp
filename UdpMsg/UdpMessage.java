@@ -1,4 +1,4 @@
-package ClientPackage;
+package UdpMsg;
 
 import java.io.*;
 import java.net.*;
@@ -20,14 +20,7 @@ public class UdpMessage {
   }
   
   public UdpMessage(DatagramPacket packet) {
-    mPacket = packet;
-    setDestination(packet.getAddress(), packet.getPort());
-    fullMsg(new String(packet.getData(), 0, packet.getLength()));
-    String[] arr = message.split(";");
-    for (int i = 0; i < arr.length; ++i) {
-        putParam(arr[i].substring(0, arr[i].indexOf("=")),
-                arr[i].substring(arr[i].indexOf("=")+1));
-    }
+    assignPacket(packet);
   }
   
   public UdpMessage(UdpMessage udpMessage) {
@@ -46,6 +39,13 @@ public class UdpMessage {
   
   public void assignPacket(DatagramPacket packet) {
       mPacket = packet;
+      setDestination(packet.getAddress(), packet.getPort());
+      fullMsg(new String(packet.getData(), 0, packet.getLength()));
+      String[] arr = message.split(";");
+      for (int i = 0; i < arr.length; ++i) {
+          putParam(arr[i].substring(0, arr[i].indexOf("=")),
+                  arr[i].substring(arr[i].indexOf("=")+1));
+      }
   }
   
   public void putParam(String key, String value) {

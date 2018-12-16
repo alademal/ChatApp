@@ -1,7 +1,7 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
-
+//HW03
 import java.util.HashMap;
 import java.util.Map;
 
@@ -41,10 +41,8 @@ public class ChatServer extends Thread {
       try {
         System.out.println("Listening for a client...");
         mSocket.receive(clientPacket);
-        System.out.println("Received packet from client");
         
         String message = new String(clientPacket.getData(), 0, clientPacket.getLength());
-        System.out.println("Received: " + message);
         InetAddress clientAddress = clientPacket.getAddress();
         int clientPort = clientPacket.getPort();
         
@@ -53,8 +51,7 @@ public class ChatServer extends Thread {
         if (parameters[0].startsWith(prefix) && (parameters[0].substring(parameters[0].indexOf('='))).equals("=JOIN")) {
           if (parameters[1].startsWith("USERNAME")) {
             clientName = parameters[1].substring(parameters[1].indexOf('=')+1);
-            String token = clientName + "|" + clientAddress.toString() + "|" + clientPort;
-            
+            String token = clientName + "'s token";
             if (!usernames.contains(clientName)) {
               usernames.add(clientName);
               existingClients.put(token, clientName);
@@ -72,7 +69,6 @@ public class ChatServer extends Thread {
               responseString += "JOINRESPONSE;STATUS=1;MESSAGE=error";
             }
             try {
-              System.out.println(responseString);
               privateMsg(responseString, mSocket, clientAddress, clientPort);
             }
             catch (IOException e) {
@@ -83,7 +79,6 @@ public class ChatServer extends Thread {
         else if ((parameters[0].substring(parameters[0].indexOf('='))).equals("=POST")
                    && parameters[1].startsWith("TOKEN=")
                    && parameters[2].startsWith("MESSAGE=")) {
-          System.out.println("Posting code reached!");
           String potentialToken = parameters[1].substring(parameters[1].indexOf('=')+1);
           String clientMessage = parameters[2].substring(parameters[2].indexOf('=')+1);
           
@@ -102,16 +97,13 @@ public class ChatServer extends Thread {
         }
         else if ((parameters[0].substring(parameters[0].indexOf('='))).equals("=LEAVE")
                    && parameters[1].startsWith("TOKEN=")) {
-          System.out.println("Leaving code reached!");
           String potentialToken = parameters[1].substring(parameters[1].indexOf('=')+1);
-          
           if (existingClients.get(potentialToken) != null) {
-            System.out.println("Passed check!");
             responseString += "BYE";
             existingClients.remove(potentialToken);
             client_ports.remove(Integer.valueOf(clientPort));
             client_addresses.remove(clientAddress);
-            
+
             try {
               privateMsg(responseString, mSocket, clientAddress, clientPort);
             }
