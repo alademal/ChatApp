@@ -41,7 +41,7 @@ public class ChatServer extends Thread {
       try {
         System.out.println("Listening for a client...");
         mSocket.receive(clientPacket);
-        
+        System.out.println("Got message from a client");
         String message = new String(clientPacket.getData(), 0, clientPacket.getLength());
         InetAddress clientAddress = clientPacket.getAddress();
         int clientPort = clientPacket.getPort();

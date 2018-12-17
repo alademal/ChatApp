@@ -10,7 +10,8 @@ public class ServerTest {
 
     private static final int SERVER_PORT = 4445;
     private static final int BUFFER_SIZE = 256;
-    private static final String HOST_NAME = "localhost";
+    private static final String HOST_NAME = "ec2-18-191-220-46.us-east-2.compute.amazonaws.com";
+//    private static final String HOST_NAME = "localhost";
 
     private static DatagramSocket mSocket;
 
