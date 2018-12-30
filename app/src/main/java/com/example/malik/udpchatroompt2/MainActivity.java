@@ -15,7 +15,7 @@ import java.net.Socket;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String SERVER_NAME = "ec2-18-191-220-46.us-east-2.compute.amazonaws.com";
+    private static final String SERVER_NAME = "localhost";
     private static final int SERVER_PORT = 4445;
     private static final int BUFFER_SIZE = 256;
 
